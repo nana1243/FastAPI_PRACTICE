@@ -3,7 +3,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Query, Path
 
 from constants import ModelName
-from models import Item
+from models import Item, db, Posts
 
 router = APIRouter()
 
@@ -119,4 +119,12 @@ async def read_items(
         results.update({"q": q})
     return results
 
+
+
+@router.get('/posts')
+async def list_posts():
+    posts = []
+    for post in db.users.find():
+        posts.append(Posts(**post))
+    return {'posts': posts}
 
