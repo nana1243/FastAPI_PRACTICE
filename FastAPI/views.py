@@ -1,8 +1,10 @@
 from typing import List, Optional
 
+import jwt as jwt
 from fastapi import APIRouter, Query, Path, Depends, Request
 from fastapi.security import APIKeyHeader
 from fastapi.security.http import HTTPBase
+from pydantic import BaseModel
 
 from constants import ModelName
 from models import Item, db, Posts
@@ -125,6 +127,17 @@ async def list_posts():
     return {'posts': posts}
 
 
+class JWTClaims(BaseModel):
+    typ: str = "JWT"
+    alg: str = "HS256"
+    jti: str
+    sub: Optional[str] = None
+    iss: str = "viodio"
+    iat: int
+    exp: int
+    token_type: str
+
+
 class APIKeyEnterprise(APIKeyHeader):
     def __init__(self):
         super().__init__(name="ViodioAK")
@@ -147,15 +160,45 @@ class APIKeyEnterprise2(HTTPBase):
         super().__init__(scheme="ViodioAK")
 
     async def __call__(self, request: Request) -> Optional[str]:
-        api_key = await super().__call__(request)
-        print("!!!!!")
-        print(api_key.scheme)
-        return api_key
+        credentials = await super().__call__(request)
+        print(credentials and credentials.credentials)
+        return credentials and credentials.credentials
+
+def decode_jwt(token: Optional[str] = None, auto_error: bool = True) -> Optional[JWTClaims]:
+    if token is None:
+        if auto_error:
+            raise ValueError("check1")
+        return None
+    print(token.encode())
+    claims = jwt.decode(token.encode(), key="12928")
+    print("this is claims!")
+    print(claims)
+
+    # try:
+    #     claims.validate(now=int(datetime.datetime.utcnow().timestamp()))
+    # except (jose_errors.ExpiredTokenError, jose_errors.InvalidClaimError) as exc:
+    #     raise HTTPException(
+    #         status_code=http.HTTPStatus.UNAUTHORIZED,
+    #         detail=jsonable_encoder(
+    #             base_schema.ErrorResponse(title=str(exc), type=exceptions.ErrorType.UNAUTHORIZED)
+    #         ),
+    #         headers={"WWW-Authenticate": AUTH_SCHEME},
+    #     )
+    # return JWTClaims(**claims)
+
+def get_current_enterprise_user(token: str):
+    claims = decode_jwt(token)  # 이거 그대로 쓰면 안됨
+    return True
+
 
 
 def current_enterprise2(api_key: str = Depends(APIKeyEnterprise2())):
-    return True
+    return get_current_enterprise_user(api_key)
 
+
+@router.get("/")
+def read_root():
+    return {"Hello": "World"}
 
 
 @router.get("/items/{item_id}")
@@ -167,4 +210,4 @@ def read_item(item_id: int, test=Depends(current_enterprise), q: Optional[str] =
 @router.get("/items")
 def read_item(test=Depends(current_enterprise2), q: Optional[str] = None):
     print("test is : ", test)
-    return {"test": ["teset1", "test2"]}
+    return {"test" : ["teset1","test2"]}
